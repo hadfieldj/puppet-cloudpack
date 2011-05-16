@@ -229,6 +229,7 @@ module Puppet::CloudPack
       options.delete(:_destroy_server_at_exit)
 
       puts "Puppet Enterprise is now installed on: #{server}"
+      puts "Node certificate name: #{certname}"
 
       classify(certname, options)
 
