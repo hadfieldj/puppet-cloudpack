@@ -188,7 +188,7 @@ module Puppet::CloudPack
         end
       end
 
-      create_tags(connection.tags, server)
+      create_tags(connection.tags, server, options)
 
       print 'Starting up '
       retries = 0
@@ -339,11 +339,16 @@ module Puppet::CloudPack
       return server
     end
 
-    def create_tags(tags, server)
+    def create_tags(tags, server, options)
       print 'Creating tags for instance ...'
       tags.create(
         :key         => 'Created-By',
         :value       => 'Puppet',
+        :resource_id => server.id
+      )
+      tags.create(
+        :key         => 'Agent certname',
+        :value       => options[:agentcertname],
         :resource_id => server.id
       )
       puts ' Done'
