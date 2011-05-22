@@ -37,6 +37,10 @@ module Puppet::CloudPack
         end
       end
 
+      action.option '--agentcertname=' do
+        required
+      end
+
       action.option '--group=', '-g=', '--security-group=' do
         before_action do |action, args, options|
           options[:group] = options[:group].split(File::PATH_SEPARATOR) unless options[:group].is_a? Array
@@ -123,7 +127,7 @@ module Puppet::CloudPack
       return nil
     end
 
-    def classify(certname, options)
+    def classify(agentcertname, options)
       puts "Using http://#{Puppet[:report_server]}:#{Puppet[:report_port]} as Dashboard."
       http = Puppet::Network::HttpPool.http_instance(Puppet[:report_server], Puppet[:report_port])
 
@@ -133,7 +137,7 @@ module Puppet::CloudPack
 
       begin
         print 'Registering node ...'
-        data = { 'node' => { 'name' => certname } }
+        data = { 'node' => { 'name' => agentcertname } }
         response = http.post('/nodes.json', data.to_pson, headers)
         if (response.code == '201')
           puts ' Done'
@@ -143,7 +147,7 @@ module Puppet::CloudPack
         end
 
         print 'Classifying node ...'
-        data = { 'node_name' => certname, 'group_name' => options[:node_group] }
+        data = { 'node_name' => agentcertname, 'group_name' => options[:node_group] }
         response = http.post("/memberships.json", data.to_pson, headers)
         if (response.code == '201')
           puts ' Done'
@@ -225,13 +229,13 @@ module Puppet::CloudPack
     end
 
     def init(server, options)
-      certname = install(server, options)
+      agentcertname = install(server, options)
       options.delete(:_destroy_server_at_exit)
 
       puts "Puppet Enterprise is now installed on: #{server}"
-      puts "Node certificate name: #{certname}"
+      puts "Node certificate name: #{agentcertname}"
 
-      classify(certname, options)
+      classify(agentcertname, options)
 
       # HACK: This should be reconciled with the Certificate Face.
       opts = options.merge(:ca_location => :remote)
@@ -240,7 +244,7 @@ module Puppet::CloudPack
 
       print "Signing certificate ..."
       begin
-        Puppet::Face[:certificate, '0.0.1'].sign(certname, opts)
+        Puppet::Face[:certificate, '0.0.1'].sign(agentcertname, opts)
         puts " Done"
       rescue Puppet::Error => e
         # TODO: Write useful next steps.
@@ -260,7 +264,7 @@ module Puppet::CloudPack
       elsif not test('x', '/usr/bin/uuidgen')
         raise "/usr/bin/uuidgen is not executable; please change that file's permissions."
       end
-      certname = `/usr/bin/uuidgen`.downcase.chomp
+      #certname = `/usr/bin/uuidgen`.downcase.chomp
 
       opts = {}
       opts[:key_data] = [File.read(keyfile)] if keyfile
@@ -297,13 +301,13 @@ module Puppet::CloudPack
       print "Installing Puppet ..."
       steps = [
         'tar -xvzf /tmp/puppet.tar.gz -C /tmp',
-        %Q[echo "q_puppetagent_certname='#{ certname }'" >> /tmp/puppet.answers],
+        %Q[echo "q_puppetagent_certname='#{ agentcertname }'" >> /tmp/puppet.answers],
         '/tmp/puppet-enterprise-1.0-all/puppet-enterprise-installer -a /tmp/puppet.answers &> /tmp/install.log'
       ]
       ssh.run(steps.map { |c| login == 'root' ? "#{c}" : "sudo #{c}" })
       puts " Done"
 
-      return certname
+      return agentcertname
     end
 
     def terminate(server, options)
